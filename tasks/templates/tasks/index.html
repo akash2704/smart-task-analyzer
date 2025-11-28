@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Task Analyzer | AI-Powered Prioritization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.5s ease-in',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .score-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .8; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">🎯 Smart Task Analyzer</h1>
+                    <p class="text-blue-100">AI-powered task prioritization system</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl font-bold">{{ tasks|length }}</div>
+                    <div class="text-sm text-blue-100">Active Tasks</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Statistics Dashboard -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Overdue</p>
+                        <p class="text-3xl font-bold text-red-600">{{ stats.overdue }}</p>
+                    </div>
+                    <div class="text-4xl">⚠️</div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">High Priority</p>
+                        <p class="text-3xl font-bold text-orange-600">{{ stats.high_priority }}</p>
+                    </div>
+                    <div class="text-4xl">🔥</div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Quick Wins</p>
+                        <p class="text-3xl font-bold text-green-600">{{ stats.quick_wins }}</p>
+                    </div>
+                    <div class="text-4xl">⚡</div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Tasks</p>
+                        <p class="text-3xl font-bold text-blue-600">{{ stats.total }}</p>
+                    </div>
+                    <div class="text-4xl">📊</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Circular Dependency Warning -->
+        {% if stats.has_cycles %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg animate-fade-in">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        <strong>⚠️ Circular Dependency Detected!</strong> {{ stats.cycle_count }} circular dependency chain(s) found. These tasks may be blocking each other.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Strategy Selector & Controls -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <!-- Strategy Selection -->
+                <div class="flex items-center gap-4">
+                    <label class="text-gray-700 font-semibold">🎯 Sorting Strategy:</label>
+                    <form method="get" id="strategy-form" class="inline">
+                        <select name="strategy" onchange="this.form.submit()" 
+                                class="px-6 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium cursor-pointer hover:border-blue-400 transition">
+                            <option value="balanced" {% if current_strategy == 'balanced' %}selected{% endif %}>
+                                ⚖️ Smart Balance
+                            </option>
+                            <option value="deadline" {% if current_strategy == 'deadline' %}selected{% endif %}>
+                                ⏰ Deadline Driven
+                            </option>
+                            <option value="quick_wins" {% if current_strategy == 'quick_wins' %}selected{% endif %}>
+                                ⚡ Quick Wins
+                            </option>
+                            <option value="impact" {% if current_strategy == 'impact' %}selected{% endif %}>
+                                ⭐ High Impact
+                            </option>
+                            <option value="dependency_first" {% if current_strategy == 'dependency_first' %}selected{% endif %}>
+                                🔗 Unblock Others
+                            </option>
+                        </select>
+                        <input type="hidden" name="show_completed" value="{{ show_completed }}">
+                    </form>
+                </div>
+
+                <!-- Toggle Completed -->
+                <div class="flex items-center gap-2">
+                    <label class="text-gray-700 font-medium">Show Completed:</label>
+                    <form method="get" class="inline">
+                        <input type="hidden" name="strategy" value="{{ current_strategy }}">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="show_completed" value="true" 
+                                   onchange="this.form.submit()"
+                                   {% if show_completed %}checked{% endif %}
+                                   class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Strategy Description -->
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <p class="text-sm text-blue-800" id="strategy-description">
+                    {% if current_strategy == 'balanced' %}
+                        <strong>Smart Balance:</strong> Weighs urgency (35%), importance (35%), effort (15%), and dependencies (15%) for optimal prioritization.
+                    {% elif current_strategy == 'deadline' %}
+                        <strong>Deadline Driven:</strong> Heavily prioritizes tasks by due date (70%) - perfect for time-sensitive work.
+                    {% elif current_strategy == 'quick_wins' %}
+                        <strong>Quick Wins:</strong> Focuses on low-effort tasks (70%) - build momentum with easy completions.
+                    {% elif current_strategy == 'impact' %}
+                        <strong>High Impact:</strong> Prioritizes importance (70%) - focus on what matters most.
+                    {% elif current_strategy == 'dependency_first' %}
+                        <strong>Unblock Others:</strong> Prioritizes tasks that block other work (50%) - clear bottlenecks first.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Input Forms -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- Add Task Form -->
+                <div class="bg-white rounded-xl shadow-lg p-6 top-4">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
+                        <span class="mr-2">➕</span> Add New Task
+                    </h2>
+                    
+                    <form method="post" class="space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="add_task" value="true">
+                        
+                        {% for field in form %}
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    {{ field.label }}
+                                </label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
+                                {% endif %}
+                                {% if field.errors %}
+                                    <p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        
+                        <button type="submit" 
+                                class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            ➕ Add Task
+                        </button>
+                    </form>
+                </div>
+
+                <!-- JSON Import -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                        <span class="mr-2">📋</span> Bulk Import (JSON)
+                    </h2>
+                    
+                    <form method="post" class="space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="import_json" value="true">
+                        
+                        {{ json_form.json_data }}
+                        {% if json_form.json_data.help_text %}
+                            <p class="text-xs text-gray-500">{{ json_form.json_data.help_text }}</p>
+                        {% endif %}
+                        
+                        <button type="submit" 
+                                class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition hover:scale-105">
+                            📥 Import Tasks
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Task List -->
+            <div class="lg:col-span-2">
+                <div class="mb-6 flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        📊 Prioritized Task List
+                    </h2>
+                    <div class="text-sm text-gray-600">
+                        Sorted by: <span class="font-semibold text-blue-600">{{ current_strategy|title }}</span>
+                    </div>
+                </div>
+
+                <!-- Task Cards -->
+                <div class="space-y-4">
+                    {% if tasks %}
+                        {% for task in tasks %}
+                        <div class="task-card bg-white rounded-xl shadow-md overflow-hidden border-l-4 
+                                    {% if task.score >= 90 %}border-red-500
+                                    {% elif task.score >= 80 %}border-orange-500
+                                    {% elif task.score >= 60 %}border-yellow-500
+                                    {% elif task.score >= 40 %}border-blue-500
+                                    {% else %}border-gray-400{% endif %}">
+                            
+                            <div class="p-6">
+                                <!-- Header Row -->
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex-1">
+                                        <h3 class="text-xl font-bold text-gray-800 mb-2 {% if task.completed %}line-through text-gray-500{% endif %}">
+                                            {{ task.title }}
+                                        </h3>
+                                        
+                                        <!-- Task Metadata -->
+                                        <div class="flex flex-wrap gap-3 text-sm">
+                                            <span class="flex items-center text-gray-600">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                </svg>
+                                                Due: {{ task.due_date }}
+                                                {% if task.is_overdue %}
+                                                    <span class="ml-1 text-red-600 font-bold">(OVERDUE)</span>
+                                                {% endif %}
+                                            </span>
+                                            
+                                            <span class="flex items-center text-gray-600">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                {{ task.estimated_hours }}h
+                                            </span>
+                                            
+                                            <span class="flex items-center text-gray-600">
+                                                <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                </svg>
+                                                {{ task.importance }}/10
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Score Badge -->
+                                    <div class="ml-4 text-center">
+                                        <div class="score-badge inline-flex items-center justify-center w-20 h-20 rounded-full 
+                                                    {% if task.score >= 90 %}bg-red-100 text-red-700
+                                                    {% elif task.score >= 80 %}bg-orange-100 text-orange-700
+                                                    {% elif task.score >= 60 %}bg-yellow-100 text-yellow-700
+                                                    {% elif task.score >= 40 %}bg-blue-100 text-blue-700
+                                                    {% else %}bg-gray-100 text-gray-700{% endif %}
+                                                    font-bold text-2xl shadow-lg">
+                                            {{ task.score }}
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">Priority</div>
+                                    </div>
+                                </div>
+
+                                <!-- Explanation -->
+                                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4 border border-blue-100">
+                                    <p class="text-sm text-gray-700">
+                                        <strong>Why this score?</strong> {{ task.explanation }}
+                                    </p>
+                                </div>
+
+                                <!-- Circular Dependency Warning -->
+                                {% if task.has_circular_dep %}
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                                    <p class="text-sm text-yellow-800 flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <strong>Circular Dependency Detected!</strong> This task is part of a dependency loop.
+                                    </p>
+                                </div>
+                                {% endif %}
+
+                                <!-- Action Buttons -->
+                                <div class="flex gap-2">
+                                    <form method="post" class="inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="toggle_complete" value="true">
+                                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                                        <button type="submit" 
+                                                class="px-4 py-2 {% if task.completed %}bg-gray-200 text-gray-700{% else %}bg-green-500 text-white{% endif %} rounded-lg font-medium hover:opacity-80 transition">
+                                            {% if task.completed %}✓ Completed{% else %}Mark Complete{% endif %}
+                                        </button>
+                                    </form>
+                                    
+                                    <form method="post" class="inline" onsubmit="return confirm('Delete this task?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="delete_task" value="true">
+                                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                                        <button type="submit" 
+                                                class="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition">
+                                            🗑️ Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="bg-white rounded-xl shadow-md p-12 text-center">
+                            <div class="text-6xl mb-4">📝</div>
+                            <h3 class="text-xl font-bold text-gray-700 mb-2">No tasks yet!</h3>
+                            <p class="text-gray-500">Add your first task to get started with intelligent prioritization.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-16 py-8 bg-white border-t border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-600">
+            <p class="mb-2">🎯 <strong>Smart Task Analyzer</strong></p>
+            <p class="text-sm">Built with Django • Powered by Advanced Algorithms • Created By Akash Ajay Kallai</p>
+        </div>
+    </footer>
+
+</body>
+</html>
